@@ -6863,20 +6863,156 @@ function sidebarOpenFolder(id) {
 })();
 </script>
 
-<script id="cp-expose">try{window.PROJECTS=PROJECTS;}catch(e){}try{window.openFolder=openFolder;}catch(e){}</script>
-<script id="cp-fallback">
+<script id="site-config-engine">
 (function(){
-  function ph(w,h,label){w=Math.max(40,Math.round(w||120));h=Math.max(40,Math.round(h||120));
-    var ico=Math.max(18,Math.min(54,Math.round(Math.min(w,h)/3.5)));var cy=h/2-(label?ico*0.3:0);
+  "use strict";
+  var BASE="https://ahmedyassen.me/Portfilio%20project/";
+  function dec(u){try{return decodeURIComponent((u||"").split("?")[0].split("#")[0].replace(BASE,"").replace("https://ahmedyassen.me/Portfilio%20project/",""));}catch(e){return u;}}
+  function keyOf(im){return dec(im.getAttribute("data-cp-orig")||im.getAttribute("src"));}
+
+  function ph(w,h){w=Math.max(40,Math.round(w||120));h=Math.max(40,Math.round(h||120));
+    var ico=Math.max(18,Math.min(54,Math.round(Math.min(w,h)/3.5))),cy=h/2;
     var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'"><rect width="'+w+'" height="'+h+'" rx="'+Math.min(12,w/12)+'" fill="#ecebf6"/><rect x="1" y="1" width="'+(w-2)+'" height="'+(h-2)+'" rx="'+Math.min(12,w/12)+'" fill="none" stroke="#cdc7e8" stroke-width="1.4" stroke-dasharray="6 5"/><g transform="translate('+(w/2)+','+cy+')" fill="none" stroke="#a99fd6" stroke-width="'+Math.max(1.5,ico/16)+'" stroke-linejoin="round" stroke-linecap="round"><rect x="'+(-ico/2)+'" y="'+(-ico/2)+'" width="'+ico+'" height="'+ico+'" rx="'+(ico/7)+'"/><circle cx="'+(-ico/6)+'" cy="'+(-ico/6)+'" r="'+(ico/9)+'"/><path d="M'+(-ico/2)+' '+(ico/4)+' L'+(-ico/8)+' '+(-ico/12)+' L'+(ico/8)+' '+(ico/6)+' L'+(ico/3)+' '+(-ico/14)+' L'+(ico/2)+' '+(ico/4)+'"/></g></svg>';
     return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s);}
+  // بديل عند فشل الأصول
   document.addEventListener("error",function(e){var el=e.target;
     if(el&&el.tagName==="IMG"&&!el.__fx&&(el.src||"").indexOf("Portfilio")>=0){el.__fx=true;
       if(!el.getAttribute("data-cp-orig"))el.setAttribute("data-cp-orig",el.getAttribute("src"));
-      var r=el.getBoundingClientRect();var w=r.width,h=r.height;
+      var r=el.getBoundingClientRect(),w=r.width,h=r.height;
       if(el.classList.contains("play-card-img")&&(w<40||h<40||h<w*0.3)){w=255;h=320;}
       el.src=ph(w||120,h||120);}
   },true);
+
+  // كشف PROJECTS/openFolder للأم
+  try{window.PROJECTS=PROJECTS;}catch(e){}
+  try{window.openFolder=openFolder;}catch(e){}
+
+  /* ===== مولّد مجلد مخصّص (للمشاريع الجديدة): اسم قابل للتعديل + صور مصغّرة من المعرض ===== */
+  var FOLDER_TAB="M397.031 20.6524C397.031 9.24638 387.785 0 376.379 0H270.568C264.713 0 259.133 2.48493 255.217 6.83667L239.953 23.7965C236.036 28.1483 230.457 30.6332 224.602 30.6332H44.8337C33.4277 30.6332 24.1813 39.8796 24.1813 51.2856V243.668C24.1813 255.074 33.4277 264.321 44.8337 264.321H376.379C387.785 264.321 397.031 255.074 397.031 243.668V20.6524Z";
+  var FOLDER_FACE="M397.031 68.2617C397.031 52.7978 384.495 40.2617 369.031 40.2617H202.156C194.169 40.2617 186.562 43.6727 181.249 49.6364L170.382 61.8343C165.069 67.798 157.463 71.209 149.475 71.209H52.1813C36.7174 71.209 24.1813 83.745 24.1813 99.209V247.7C24.1813 263.164 36.7174 275.7 52.1813 275.7H369.031C384.495 275.7 397.031 263.164 397.031 247.7L397.031 68.2617Z";
+  function shade(hex,p){hex=(hex||"#888888").replace("#","");if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);function a(c){return Math.max(0,Math.min(255,Math.round(c+p*255)));}function h(c){return ("0"+c.toString(16)).slice(-2);}return "#"+h(a(r))+h(a(g))+h(a(b));}
+  window.__makeFolderSVG=function(uid,name,color,previews){
+    color=color||"#6d8bff";
+    var back=shade(color,-0.13),tab=shade(color,-0.03),faceTop=shade(color,0.20),faceBot=color,txt=shade(color,-0.5);
+    var cards=[{x:65,y:45,w:230,h:167,rx:20,rot:-4},{x:80,y:17,w:230,h:167,rx:20,rot:2},{x:98,y:23,w:230,h:167,rx:20,rot:-2},{x:112,y:55,w:230,h:152,rx:20,rot:3}];
+    var clips="",imgs="";
+    (previews||[]).slice(0,4).forEach(function(pv,i){if(!pv||!pv.img)return;var c=cards[i],cid="ccp_"+uid+"_"+i,tr=c.rot?(' transform="rotate('+c.rot+' '+c.x+' '+c.y+')"'):"";
+      clips+='<clipPath id="'+cid+'"><rect x="'+c.x+'" y="'+c.y+'" width="'+c.w+'" height="'+c.h+'" rx="'+c.rx+'"'+tr+'/></clipPath>';
+      imgs+='<g class="fsv-card" clip-path="url(#'+cid+')"><image href="'+pv.img+'" x="'+c.x+'" y="'+c.y+'" width="'+c.w+'" height="'+c.h+'" preserveAspectRatio="xMidYMid slice"'+tr+'/></g>';});
+    var L=(name||"").length,fs=L>11?28:L>8?34:L>5?42:52;
+    return '<svg width="422" height="292" viewBox="0 0 422 292" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'+
+      '<defs><linearGradient id="fg_'+uid+'" x1="210" y1="40" x2="210" y2="276" gradientUnits="userSpaceOnUse"><stop stop-color="'+faceTop+'"/><stop offset="1" stop-color="'+faceBot+'"/></linearGradient>'+clips+'</defs>'+
+      '<rect x="24.18" y="107.35" width="372.83" height="176.09" rx="22" fill="'+back+'"/>'+
+      '<path d="'+FOLDER_TAB+'" fill="'+tab+'"/>'+imgs+
+      '<path class="fsv-face" d="'+FOLDER_FACE+'" fill="url(#fg_'+uid+')"/>'+
+      '<text x="210" y="205" text-anchor="middle" font-family="DM Sans, sans-serif" font-weight="800" font-size="'+fs+'" fill="'+txt+'" opacity="0.92">'+escapeHtml(name||"Project")+'</text>'+
+      '</svg>';
+  };
+  window.__makeCustomFolder=function(o){
+    if(document.getElementById(o.id))return document.getElementById(o.id);
+    var canvas=document.getElementById("canvas")||document.body;
+    var d=document.createElement("div");d.className="folder folder-svg-variant";d.id=o.id;d.setAttribute("data-project",o.key);
+    d.style.cssText="position:absolute;top:"+(o.top||"296px")+";left:"+(o.left||1200)+"px;width:240px;height:226px;";
+    d.innerHTML='<div class="fsv-wrapper">'+window.__makeFolderSVG(o.id,o.name,o.color,o.previews)+'</div><div class="folder-label"><h3>'+escapeHtml(o.name||"Project")+'</h3><p>'+escapeHtml(o.role||"")+'</p></div>';
+    canvas.appendChild(d);
+    d.addEventListener("click",function(){if(typeof openFolder==="function")openFolder(d);});
+    if(typeof PROJECTS!=="undefined")PROJECTS[o.key]={name:o.name,desc:o.role||"",labels:o.labels||[],note:o.note||"",link:o.link||"",linkText:o.linkText||"",previews:o.previews||[]};
+    return d;
+  };
+  window.__updateCustomFolder=function(id,o){
+    var d=document.getElementById(id);if(!d)return;
+    var w=d.querySelector(".fsv-wrapper");if(w)w.innerHTML=window.__makeFolderSVG(id,o.name,o.color,o.previews);
+    var h=d.querySelector(".folder-label h3"),p=d.querySelector(".folder-label p");if(h&&o.name!=null)h.textContent=o.name;if(p&&o.role!=null)p.textContent=o.role;
+  };
+
+
+  /* ========= تطبيق الإعدادات ========= */
+  window.__applyConfig=function(cfg){
+    if(!cfg)return;
+    try{
+      // نصوص
+      if(cfg.texts)for(var sel in cfg.texts){var el=document.querySelector(sel);if(el){var v=cfg.texts[sel],done=false;for(var i=0;i<el.childNodes.length;i++){var n=el.childNodes[i];if(n.nodeType===3&&n.textContent.trim()){n.textContent=v;done=true;break;}}if(!done)el.textContent=v;}}
+      // SEO
+      if(cfg.seo){if(cfg.seo.title){document.title=cfg.seo.title;}if(cfg.seo.description){var md=document.querySelector('meta[name=description]');if(!md){md=document.createElement('meta');md.name='description';document.head.appendChild(md);}md.content=cfg.seo.description;}}
+      // صور
+      if(cfg.images)document.querySelectorAll("img").forEach(function(im){var k=keyOf(im);if(cfg.images[k]){if(!im.getAttribute("data-cp-orig"))im.setAttribute("data-cp-orig",im.getAttribute("src"));im.src=cfg.images[k];}});
+      // فيديو
+      if(cfg.videos){var vids=document.querySelectorAll("video");for(var vi in cfg.videos){if(vids[vi]){vids[vi].setAttribute("data-src",cfg.videos[vi]);vids[vi].src=cfg.videos[vi];vids[vi].muted=true;vids[vi].loop=true;try{vids[vi].load();}catch(e){}}}}
+      // مشاريع موجودة
+      if(cfg.projects&&typeof PROJECTS!=="undefined")for(var k in cfg.projects){if(!PROJECTS[k])PROJECTS[k]={};var s=cfg.projects[k];for(var pp in s)PROJECTS[k][pp]=s[pp];
+        // زامن أسماء المجلدات
+        var map={tapcard:"f6",tapcard2:"f7",tapcard3:"f8",tapcard4:"f9",tapcard5:"f10"};if(map[k]){var f=document.getElementById(map[k]);if(f){var h=f.querySelector(".folder-label h3"),p=f.querySelector(".folder-label p");if(h&&s.folderName)h.textContent=s.folderName;if(p&&s.desc)p.textContent=s.desc;}}}
+      // مشاريع جديدة (مجلد مخصّص: اسم نصي + صور مصغّرة من المعرض)
+      if(cfg.newProjects&&typeof PROJECTS!=="undefined")cfg.newProjects.forEach(function(np){
+        if(document.getElementById(np.id)){window.__updateCustomFolder(np.id,np);if(PROJECTS[np.key]){PROJECTS[np.key].previews=np.previews||PROJECTS[np.key].previews;PROJECTS[np.key].name=np.name;PROJECTS[np.key].desc=np.role||"";}return;}
+        window.__makeCustomFolder(np);
+      });
+      // CV
+      if(cfg.cv){var ifr=document.querySelector("#cv-pdf-card iframe");if(ifr)ifr.src=cfg.cv+(cfg.cv.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");document.querySelectorAll("a[download]").forEach(function(a){if((a.href||"").indexOf("CV")>=0)a.href=cfg.cv;});}
+      // مظهر
+      if(cfg.style){var st=cfg.style;
+        if(st.bg){document.body.style.background=st.bg;if(st.dot){document.body.style.backgroundImage="radial-gradient(circle, "+st.dot+" 1px, transparent 1px)";document.body.style.backgroundSize="28px 28px";}}
+        if(st.name){var n=document.querySelector("#hero-name");if(n)n.style.color=st.name;}
+        if(st.zoom){var cv=document.getElementById("canvas");if(cv)cv.style.zoom=st.zoom;}
+        if(st.font){var fl=document.getElementById("cfg-font");if(!fl){fl=document.createElement("link");fl.id="cfg-font";fl.rel="stylesheet";document.head.appendChild(fl);}fl.href="https://fonts.googleapis.com/css2?family="+encodeURIComponent(st.font)+":wght@300;400;500;600;700&display=swap";document.body.style.fontFamily="'"+st.font+"',sans-serif";}
+        if(st.customCSS!=null){var cs=document.getElementById("cfg-css");if(!cs){cs=document.createElement("style");cs.id="cfg-css";document.head.appendChild(cs);}cs.textContent=st.customCSS;}
+      }
+      // إظهار/إخفاء
+      if(cfg.visibility)for(var vsel in cfg.visibility){document.querySelectorAll(vsel).forEach(function(e){e.style.display=cfg.visibility[vsel]?"":"none";});}
+      // الصفحات المخصصة
+      renderPages(cfg.pages||[]);
+    }catch(err){console.warn("applyConfig",err);}
+  };
+
+  /* صفحات مخصصة: بطاقات على اللوحة تفتح نافذة */
+  function renderPages(pages){
+    document.querySelectorAll(".cfg-page-card").forEach(function(e){e.remove()});
+    var canvas=document.getElementById("canvas")||document.body;
+    pages.forEach(function(pg,idx){
+      if(pg.hidden)return;
+      var card=document.createElement("div");card.className="cfg-page-card";
+      card.style.cssText="position:absolute;left:"+(pg.left!=null?pg.left:(1240+idx*30))+"px;top:"+(pg.top!=null?pg.top:(560+idx*70))+"px;width:190px;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.12);cursor:pointer;font-family:'DM Sans',sans-serif;border:1px solid #eee;transition:transform .25s,box-shadow .25s;z-index:30;";
+      card.innerHTML='<div style="font-size:26px;margin-bottom:8px">'+(pg.icon||"📄")+'</div><div style="font-weight:700;font-size:15px;color:#1a1a1a">'+escapeHtml(pg.title||"صفحة")+'</div><div style="font-size:11px;color:#999;margin-top:4px">اضغط للفتح</div>';
+      card.onmouseenter=function(){card.style.transform="translateY(-4px) scale(1.03)";card.style.boxShadow="0 18px 40px rgba(0,0,0,.18)";};
+      card.onmouseleave=function(){card.style.transform="";card.style.boxShadow="0 10px 30px rgba(0,0,0,.12)";};
+      card.onclick=function(){openPage(pg);};
+      canvas.appendChild(card);
+    });
+  }
+  function openPage(pg){
+    var ov=document.createElement("div");ov.className="cfg-page-overlay";
+    ov.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(20,18,28,.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;animation:cfgFade .25s ease;font-family:'DM Sans',sans-serif;";
+    var box=document.createElement("div");
+    box.style.cssText="background:#fff;max-width:760px;width:92%;max-height:86vh;overflow:auto;border-radius:22px;padding:38px 42px;box-shadow:0 40px 100px rgba(0,0,0,.4);position:relative;animation:cfgPop .3s cubic-bezier(.34,1.4,.5,1);";
+    box.innerHTML='<button style="position:absolute;top:18px;left:18px;width:38px;height:38px;border-radius:11px;border:none;background:#f0eef8;color:#555;font-size:18px;cursor:pointer">✕</button>'+
+      '<div style="font-size:40px;margin-bottom:12px">'+(pg.icon||"📄")+'</div>'+
+      '<h1 style="font-size:30px;font-weight:700;color:#1a1a1a;margin:0 0 18px">'+escapeHtml(pg.title||"")+'</h1>'+
+      '<div style="font-size:16px;line-height:1.85;color:#333">'+(pg.html||escapeHtml(pg.content||"").replace(/\n/g,"<br>"))+'</div>';
+    box.querySelector("button").onclick=function(){ov.remove();};
+    ov.onclick=function(e){if(e.target===ov)ov.remove();};
+    box.onclick=function(e){e.stopPropagation();};
+    ov.appendChild(box);document.body.appendChild(ov);
+  }
+  function escapeHtml(s){return (s==null?"":""+s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  if(!document.getElementById("cfg-anim")){var a=document.createElement("style");a.id="cfg-anim";a.textContent="@keyframes cfgFade{from{opacity:0}to{opacity:1}}@keyframes cfgPop{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}";document.head.appendChild(a);}
+
+  /* ========= تحميل الإعدادات ========= */
+  function loadAndApply(){
+    var local=null;
+    try{var ls=localStorage.getItem("site_config");if(ls)local=JSON.parse(ls);}catch(e){}
+    if(local)window.__applyConfig(local);
+    // ثم جلب الإعدادات المنشورة على المستودع (تظهر لكل الزوّار)
+    fetch("site-config.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(remote){
+      if(remote){
+        // المحلي يطغى على المنشور لصاحب الموقع، لكن إن لم يوجد محلي طبّق المنشور
+        if(!local)window.__applyConfig(remote);
+      }
+    }).catch(function(){});
+  }
+  // طبّق عدة مرات لتجاوز أنيميشن الموقع الذي قد يكتب فوق القيم
+  function loadAndApplyMulti(){loadAndApply();[400,1000,1800,2800].forEach(function(t){setTimeout(loadAndApply,t);});}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",loadAndApplyMulti);else loadAndApplyMulti();
+  window.addEventListener("load",function(){setTimeout(loadAndApply,300);});
 })();
 </script>
 
