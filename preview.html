@@ -6887,11 +6887,11 @@ function sidebarOpenFolder(id) {
   try{window.PROJECTS=PROJECTS;}catch(e){}
   try{window.openFolder=openFolder;}catch(e){}
 
-  /* ===== مولّد مجلد مخصّص (للمشاريع الجديدة): اسم قابل للتعديل + صور مصغّرة من المعرض ===== */
+  /* ===== مولّد مجلد مخصّص (للمشاريع الجديدة) ===== */
   var FOLDER_TAB="M397.031 20.6524C397.031 9.24638 387.785 0 376.379 0H270.568C264.713 0 259.133 2.48493 255.217 6.83667L239.953 23.7965C236.036 28.1483 230.457 30.6332 224.602 30.6332H44.8337C33.4277 30.6332 24.1813 39.8796 24.1813 51.2856V243.668C24.1813 255.074 33.4277 264.321 44.8337 264.321H376.379C387.785 264.321 397.031 255.074 397.031 243.668V20.6524Z";
   var FOLDER_FACE="M397.031 68.2617C397.031 52.7978 384.495 40.2617 369.031 40.2617H202.156C194.169 40.2617 186.562 43.6727 181.249 49.6364L170.382 61.8343C165.069 67.798 157.463 71.209 149.475 71.209H52.1813C36.7174 71.209 24.1813 83.745 24.1813 99.209V247.7C24.1813 263.164 36.7174 275.7 52.1813 275.7H369.031C384.495 275.7 397.031 263.164 397.031 247.7L397.031 68.2617Z";
-  function shade(hex,p){hex=(hex||"#888888").replace("#","");if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);function a(c){return Math.max(0,Math.min(255,Math.round(c+p*255)));}function h(c){return ("0"+c.toString(16)).slice(-2);}return "#"+h(a(r))+h(a(g))+h(a(b));}
-  window.__makeFolderSVG=function(uid,name,color,previews){
+  function shade(hex,p){hex=(hex||"#888888").replace("#","");if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);function a(c){return Math.max(0,Math.min(255,Math.round(c+p*255)));}function hh(c){return ("0"+c.toString(16)).slice(-2);}return "#"+hh(a(r))+hh(a(g))+hh(a(b));}
+  window.__makeFolderSVG=function(uid,brand,color,previews){
     color=color||"#6d8bff";
     var back=shade(color,-0.13),tab=shade(color,-0.03),faceTop=shade(color,0.20),faceBot=color,txt=shade(color,-0.5);
     var cards=[{x:65,y:45,w:230,h:167,rx:20,rot:-4},{x:80,y:17,w:230,h:167,rx:20,rot:2},{x:98,y:23,w:230,h:167,rx:20,rot:-2},{x:112,y:55,w:230,h:152,rx:20,rot:3}];
@@ -6899,32 +6899,56 @@ function sidebarOpenFolder(id) {
     (previews||[]).slice(0,4).forEach(function(pv,i){if(!pv||!pv.img)return;var c=cards[i],cid="ccp_"+uid+"_"+i,tr=c.rot?(' transform="rotate('+c.rot+' '+c.x+' '+c.y+')"'):"";
       clips+='<clipPath id="'+cid+'"><rect x="'+c.x+'" y="'+c.y+'" width="'+c.w+'" height="'+c.h+'" rx="'+c.rx+'"'+tr+'/></clipPath>';
       imgs+='<g class="fsv-card" clip-path="url(#'+cid+')"><image href="'+pv.img+'" x="'+c.x+'" y="'+c.y+'" width="'+c.w+'" height="'+c.h+'" preserveAspectRatio="xMidYMid slice"'+tr+'/></g>';});
-    var L=(name||"").length,fs=L>11?28:L>8?34:L>5?42:52;
+    var brandSVG="";
+    if(brand&&(""+brand).trim()){var L=(""+brand).length,fs=L>11?28:L>8?34:L>5?42:52;
+      brandSVG='<text x="210" y="205" text-anchor="middle" font-family="DM Sans, sans-serif" font-weight="800" font-size="'+fs+'" fill="'+txt+'" opacity="0.92">'+escapeHtml(brand)+'</text>';}
     return '<svg width="422" height="292" viewBox="0 0 422 292" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'+
       '<defs><linearGradient id="fg_'+uid+'" x1="210" y1="40" x2="210" y2="276" gradientUnits="userSpaceOnUse"><stop stop-color="'+faceTop+'"/><stop offset="1" stop-color="'+faceBot+'"/></linearGradient>'+clips+'</defs>'+
       '<rect x="24.18" y="107.35" width="372.83" height="176.09" rx="22" fill="'+back+'"/>'+
       '<path d="'+FOLDER_TAB+'" fill="'+tab+'"/>'+imgs+
-      '<path class="fsv-face" d="'+FOLDER_FACE+'" fill="url(#fg_'+uid+')"/>'+
-      '<text x="210" y="205" text-anchor="middle" font-family="DM Sans, sans-serif" font-weight="800" font-size="'+fs+'" fill="'+txt+'" opacity="0.92">'+escapeHtml(name||"Project")+'</text>'+
-      '</svg>';
+      '<path class="fsv-face" d="'+FOLDER_FACE+'" fill="url(#fg_'+uid+')"/>'+brandSVG+'</svg>';
   };
+  function folderInner(o){
+    if(o.customSVG&&(""+o.customSVG).trim())return o.customSVG;
+    if(o.customImg)return '<img src="'+o.customImg+'" alt="" style="width:100%;height:100%;object-fit:contain;display:block">';
+    return window.__makeFolderSVG(o.id,o.brand||"",o.color,o.previews);
+  }
+  function bindFolderToggle(d){
+    var dx=0,dy=0;
+    d.addEventListener("pointerdown",function(e){dx=e.clientX;dy=e.clientY;});
+    d.addEventListener("pointerup",function(e){
+      if(Math.abs(e.clientX-dx)>5||Math.abs(e.clientY-dy)>5)return;
+      if(e.target.closest&&e.target.closest(".pip-close"))return;
+      var cur=null;try{cur=openFolderId;}catch(_){cur=null;}
+      function close(){try{if(typeof closeFolder==="function")closeFolder();}catch(_){}}
+      function open(){try{if(typeof openFolder==="function")openFolder(d);}catch(_){}}
+      if(cur===d.id){close();}
+      else{if(cur)close();setTimeout(open,cur?60:0);}
+    });
+  }
   window.__makeCustomFolder=function(o){
-    if(document.getElementById(o.id))return document.getElementById(o.id);
+    if(document.getElementById(o.id)){window.__updateCustomFolder(o.id,o);return document.getElementById(o.id);}
     var canvas=document.getElementById("canvas")||document.body;
     var d=document.createElement("div");d.className="folder folder-svg-variant";d.id=o.id;d.setAttribute("data-project",o.key);
-    d.style.cssText="position:absolute;top:"+(o.top||"296px")+";left:"+(o.left||1200)+"px;width:240px;height:226px;";
-    d.innerHTML='<div class="fsv-wrapper">'+window.__makeFolderSVG(o.id,o.name,o.color,o.previews)+'</div><div class="folder-label"><h3>'+escapeHtml(o.name||"Project")+'</h3><p>'+escapeHtml(o.role||"")+'</p></div>';
+    d.style.cssText="position:absolute;top:"+(o.top||"540px")+";left:"+(o.left||0)+"px;width:240px;height:226px;";
+    d.innerHTML='<div class="fsv-wrapper">'+folderInner(o)+'</div><div class="folder-label"><h3>'+escapeHtml(o.name||"Project")+'</h3><p>'+escapeHtml(o.role||"")+'</p></div>';
     canvas.appendChild(d);
-    d.addEventListener("click",function(){if(typeof openFolder==="function")openFolder(d);});
+    bindFolderToggle(d);
     if(typeof PROJECTS!=="undefined")PROJECTS[o.key]={name:o.name,desc:o.role||"",labels:o.labels||[],note:o.note||"",link:o.link||"",linkText:o.linkText||"",previews:o.previews||[]};
     return d;
   };
   window.__updateCustomFolder=function(id,o){
     var d=document.getElementById(id);if(!d)return;
-    var w=d.querySelector(".fsv-wrapper");if(w)w.innerHTML=window.__makeFolderSVG(id,o.name,o.color,o.previews);
+    var w=d.querySelector(".fsv-wrapper");if(w)w.innerHTML=folderInner(o);
     var h=d.querySelector(".folder-label h3"),p=d.querySelector(".folder-label p");if(h&&o.name!=null)h.textContent=o.name;if(p&&o.role!=null)p.textContent=o.role;
+    if(o.left!=null)d.style.left=o.left+"px";if(o.top!=null)d.style.top=(""+o.top).replace("px","")+"px";
   };
-
+  // موضع شبكي: ٦ بالصف أسفل المجلدات الأصلية، الأحدث في الأعلى (يسار)
+  window.__layoutNewProjects=function(list){
+    var N=list.length;
+    list.forEach(function(np,i){var rank=N-1-i; // الأحدث أولاً (يمين Baeynh مباشرة)
+      np.left=1200+rank*240; np.top="296px";});
+  };
 
   /* ========= تطبيق الإعدادات ========= */
   window.__applyConfig=function(cfg){
@@ -6942,11 +6966,14 @@ function sidebarOpenFolder(id) {
       if(cfg.projects&&typeof PROJECTS!=="undefined")for(var k in cfg.projects){if(!PROJECTS[k])PROJECTS[k]={};var s=cfg.projects[k];for(var pp in s)PROJECTS[k][pp]=s[pp];
         // زامن أسماء المجلدات
         var map={tapcard:"f6",tapcard2:"f7",tapcard3:"f8",tapcard4:"f9",tapcard5:"f10"};if(map[k]){var f=document.getElementById(map[k]);if(f){var h=f.querySelector(".folder-label h3"),p=f.querySelector(".folder-label p");if(h&&s.folderName)h.textContent=s.folderName;if(p&&s.desc)p.textContent=s.desc;}}}
-      // مشاريع جديدة (مجلد مخصّص: اسم نصي + صور مصغّرة من المعرض)
-      if(cfg.newProjects&&typeof PROJECTS!=="undefined")cfg.newProjects.forEach(function(np){
-        if(document.getElementById(np.id)){window.__updateCustomFolder(np.id,np);if(PROJECTS[np.key]){PROJECTS[np.key].previews=np.previews||PROJECTS[np.key].previews;PROJECTS[np.key].name=np.name;PROJECTS[np.key].desc=np.role||"";}return;}
-        window.__makeCustomFolder(np);
-      });
+      // مشاريع جديدة (مجلد مخصّص + شبكة منظّمة + بلا تكرار)
+      if(cfg.newProjects&&typeof PROJECTS!=="undefined"){
+        window.__layoutNewProjects(cfg.newProjects);
+        cfg.newProjects.forEach(function(np){
+          window.__makeCustomFolder(np);
+          if(PROJECTS[np.key]){PROJECTS[np.key].previews=np.previews||PROJECTS[np.key].previews;PROJECTS[np.key].name=np.name;PROJECTS[np.key].desc=np.role||"";PROJECTS[np.key].labels=np.labels||PROJECTS[np.key].labels;PROJECTS[np.key].note=np.note||PROJECTS[np.key].note;PROJECTS[np.key].link=np.link||PROJECTS[np.key].link;PROJECTS[np.key].linkText=np.linkText||PROJECTS[np.key].linkText;}
+        });
+      }
       // CV
       if(cfg.cv){var ifr=document.querySelector("#cv-pdf-card iframe");if(ifr)ifr.src=cfg.cv+(cfg.cv.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");document.querySelectorAll("a[download]").forEach(function(a){if((a.href||"").indexOf("CV")>=0)a.href=cfg.cv;});}
       // مظهر

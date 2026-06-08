@@ -355,6 +355,21 @@
       b.appendChild(field("الوصف / النوت",(p.note||"").replace(/\\n/g,"\n"),function(v){p.note=v;},true));
       b.appendChild(field("رابط المشروع",p.link,function(v){p.link=v;}));
       b.appendChild(field("نص زر الرابط",p.linkText,function(v){p.linkText=v;}));
+      if(NP){
+        var gt0=document.createElement("div");gt0.className="gt";gt0.textContent="شكل المجلد (مخصّص)";b.appendChild(gt0);
+        b.appendChild(field("نص داخل المجلد (اختياري — فارغ افتراضياً)",NP.brand||"",function(v){NP.brand=v;refreshFolder(NP);}));
+        var cw=document.createElement("div");cw.className="color";cw.innerHTML='<label>لون المجلد</label><input type="color" value="'+(NP.color||"#5AA8FF")+'">';
+        cw.querySelector("input").oninput=function(){NP.color=this.value;refreshFolder(NP);markDirty();};b.appendChild(cw);
+        var up=document.createElement("div");up.className="acts";up.style.marginBottom="8px";
+        up.innerHTML='<button class="mini upsvg">⬆ رفع شكل المجلد (SVG)</button><button class="mini upimg">🖼️ رفع صورة المجلد</button>';
+        up.querySelector(".upsvg").onclick=function(){pickFile(".svg,image/svg+xml",function(f){var r=new FileReader();r.onload=function(){NP.customSVG=r.result;NP.customImg="";refreshFolder(NP);markDirty();toast("تم رفع شكل المجلد ✓");};r.readAsText(f);});};
+        up.querySelector(".upimg").onclick=function(){pickFile("image/*",function(f){fileToDataURL(f,function(dt){NP.customImg=dt;NP.customSVG="";refreshFolder(NP);markDirty();toast("تم رفع صورة المجلد ✓");});});};
+        b.appendChild(up);
+        if(NP.customSVG||NP.customImg){var clr=document.createElement("button");clr.className="mini danger";clr.style.width="100%";clr.style.marginBottom="8px";clr.textContent="↺ إزالة الشكل المخصّص (عودة للافتراضي)";clr.onclick=function(){NP.customSVG="";NP.customImg="";refreshFolder(NP);markDirty();projectList();};b.appendChild(clr);}
+        var delp=document.createElement("button");delp.className="mini danger";delp.style.width="100%";delp.textContent="🗑 حذف المشروع";
+        delp.onclick=function(){if(!confirm("حذف هذا المشروع؟"))return;var d2=fdoc();if(d2){var el=d2.getElementById(NP.id);if(el)el.remove();}cfg.newProjects=cfg.newProjects.filter(function(x){return x.id!==NP.id;});var W=fwin();if(W&&W.__layoutNewProjects){W.__layoutNewProjects(cfg.newProjects);cfg.newProjects.forEach(function(x){W.__updateCustomFolder(x.id,x);});}markDirty();projectList();toast("حُذف المشروع");};
+        b.appendChild(delp);
+      }
       var gt=document.createElement("div");gt.className="gt";gt.textContent="شاشات المعرض";b.appendChild(gt);
       var sl=document.createElement("div");b.appendChild(sl);
       function syncNP(){if(NP){NP.previews=p.previews;refreshFolder(NP);}}
@@ -371,12 +386,15 @@
       b.appendChild(add);list.appendChild(box);});}
   var PROJ_COLORS=["#FFC23D","#FF7A7A","#C26BFF","#46C46B","#5AA8FF","#FF9F45","#41D1C0","#FF6FA5","#7C6CFF","#2DD4BF"];
   function createProject(){var d=fdoc(),W=fwin();if(!d||!W||typeof W.__makeCustomFolder!=="function")return toast("حدّث المعاينة أولاً",1);
-    var name=prompt("اسم المشروع الجديد:","New Project");if(!name)return;var role=prompt("الدور / الوصف:","Product Designer")||"";
-    var n=cfg.newProjects.length+1;var key="cpproj"+Date.now().toString(36),id="cpf"+Date.now().toString(36);var left=960+240*(countNew()+1);
+    var name=prompt("اسم المشروع (يظهر تحت المجلد):","New Project");if(!name)return;var role=prompt("الدور / الوصف:","Product Designer")||"";
+    var key="cpproj"+Date.now().toString(36),id="cpf"+Date.now().toString(36);
     var color=PROJ_COLORS[countNew()%PROJ_COLORS.length];
-    var np={key:key,id:id,name:name,role:role,color:color,left:left,top:"296px",previews:[],labels:[],note:"",link:"",linkText:""};
+    var np={key:key,id:id,name:name,role:role,brand:"",color:color,customSVG:"",customImg:"",top:"540px",left:0,previews:[],labels:[],note:"",link:"",linkText:""};
+    cfg.newProjects.push(np);
+    if(typeof W.__layoutNewProjects==="function")W.__layoutNewProjects(cfg.newProjects);
     W.__makeCustomFolder(np);
-    cfg.newProjects.push(np);markDirty();projectList();toast("أُنشئ المشروع — أضف شاشاته (ستظهر كصور مصغّرة) ثم احفظ");}
+    if(typeof W.__layoutNewProjects==="function"){W.__layoutNewProjects(cfg.newProjects);cfg.newProjects.forEach(function(x){W.__updateCustomFolder(x.id,x);});}
+    markDirty();projectList();toast("أُنشئ المشروع — شكل المجلد فارغ. أضف شاشاته أو ارفع شكل SVG ثم احفظ");}
   function countNew(){return cfg.newProjects.length;}
   function refreshFolder(np){var W=fwin();if(W&&typeof W.__updateCustomFolder==="function")W.__updateCustomFolder(np.id,np);}
 
