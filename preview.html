@@ -6887,6 +6887,25 @@ function sidebarOpenFolder(id) {
   try{window.PROJECTS=PROJECTS;}catch(e){}
   try{window.openFolder=openFolder;}catch(e){}
 
+  // إخفاء المشاريع الجديدة في وضع Craft (مثل الأصلية)
+  (function(){var st=document.getElementById("cfg-newfolder-hide");if(!st){st=document.createElement("style");st.id="cfg-newfolder-hide";st.textContent="body.play-mode .cfg-newfolder{display:none !important;}";document.head.appendChild(st);}})();
+  // عرض الفيديو بنسبته الأصلية
+  window.__fitVideo=function(v){try{if(!v.videoWidth||!v.videoHeight)return;var MAX=420,a=v.videoWidth/v.videoHeight,w,hh;
+    if(v.videoWidth>=v.videoHeight){w=MAX;hh=Math.round(MAX/a);}else{hh=MAX;w=Math.round(MAX*a);}
+    v.style.width=w+"px";v.style.height=hh+"px";v.style.objectFit="cover";v.style.maxWidth="none";}catch(e){}};
+  // التحكم بالصوت: يبدأ 20% + عجلة الماوس ترفع/تخفض + إلغاء كتم عند المرور
+  window.__wireVideoVolume=function(){
+    document.querySelectorAll("video.play-card-video, video").forEach(function(v){
+      if(v.__volWired)return;v.__volWired=true;try{v.volume=0.2;}catch(e){}
+      v.addEventListener("play",function(){try{v.volume=(v.__vol!=null?v.__vol:0.2);}catch(e){}});
+      var card=v.closest(".play-card-inner")||v.parentNode||v;
+      card.addEventListener("mouseenter",function(){try{v.muted=false;if(v.__vol==null)v.__vol=0.2;v.volume=v.__vol;}catch(e){}});
+      card.addEventListener("mouseleave",function(){try{v.muted=true;}catch(e){}});
+      card.addEventListener("wheel",function(e){try{e.preventDefault();v.muted=false;var d=e.deltaY<0?0.06:-0.06;var nv=Math.max(0,Math.min(1,(v.__vol!=null?v.__vol:(v.volume||0.2))+d));v.__vol=nv;v.volume=nv;}catch(_){}}, {passive:false});
+    });
+  };
+
+
   /* ===== مولّد مجلد مخصّص (للمشاريع الجديدة) ===== */
   var FOLDER_TAB="M397.031 20.6524C397.031 9.24638 387.785 0 376.379 0H270.568C264.713 0 259.133 2.48493 255.217 6.83667L239.953 23.7965C236.036 28.1483 230.457 30.6332 224.602 30.6332H44.8337C33.4277 30.6332 24.1813 39.8796 24.1813 51.2856V243.668C24.1813 255.074 33.4277 264.321 44.8337 264.321H376.379C387.785 264.321 397.031 255.074 397.031 243.668V20.6524Z";
   var FOLDER_FACE="M397.031 68.2617C397.031 52.7978 384.495 40.2617 369.031 40.2617H202.156C194.169 40.2617 186.562 43.6727 181.249 49.6364L170.382 61.8343C165.069 67.798 157.463 71.209 149.475 71.209H52.1813C36.7174 71.209 24.1813 83.745 24.1813 99.209V247.7C24.1813 263.164 36.7174 275.7 52.1813 275.7H369.031C384.495 275.7 397.031 263.164 397.031 247.7L397.031 68.2617Z";
@@ -6929,7 +6948,7 @@ function sidebarOpenFolder(id) {
   window.__makeCustomFolder=function(o){
     if(document.getElementById(o.id)){window.__updateCustomFolder(o.id,o);return document.getElementById(o.id);}
     var canvas=document.getElementById("canvas")||document.body;
-    var d=document.createElement("div");d.className="folder folder-svg-variant";d.id=o.id;d.setAttribute("data-project",o.key);
+    var d=document.createElement("div");d.className="folder folder-svg-variant cfg-newfolder";d.id=o.id;d.setAttribute("data-project",o.key);
     d.style.cssText="position:absolute;top:"+(o.top||"540px")+";left:"+(o.left||0)+"px;width:240px;height:226px;";
     d.innerHTML='<div class="fsv-wrapper">'+folderInner(o)+'</div><div class="folder-label"><h3>'+escapeHtml(o.name||"Project")+'</h3><p>'+escapeHtml(o.role||"")+'</p></div>';
     canvas.appendChild(d);
@@ -6961,7 +6980,9 @@ function sidebarOpenFolder(id) {
       // صور
       if(cfg.images)document.querySelectorAll("img").forEach(function(im){var k=keyOf(im);if(cfg.images[k]){if(!im.getAttribute("data-cp-orig"))im.setAttribute("data-cp-orig",im.getAttribute("src"));im.src=cfg.images[k];}});
       // فيديو
-      if(cfg.videos){var vids=document.querySelectorAll("video");for(var vi in cfg.videos){if(vids[vi]){vids[vi].setAttribute("data-src",cfg.videos[vi]);vids[vi].src=cfg.videos[vi];vids[vi].muted=true;vids[vi].loop=true;try{vids[vi].load();}catch(e){}}}}
+      if(cfg.videos){var vids=document.querySelectorAll("video");for(var vi in cfg.videos){if(vids[vi]){vids[vi].setAttribute("data-src",cfg.videos[vi]);vids[vi].src=cfg.videos[vi];vids[vi].loop=true;try{vids[vi].load();}catch(e){}
+        (function(vv){function fit(){window.__fitVideo&&window.__fitVideo(vv);}vv.addEventListener("loadedmetadata",fit);if(vv.readyState>=1)fit();})(vids[vi]);}}}
+      if(window.__wireVideoVolume)window.__wireVideoVolume();
       // مشاريع موجودة
       if(cfg.projects&&typeof PROJECTS!=="undefined")for(var k in cfg.projects){if(!PROJECTS[k])PROJECTS[k]={};var s=cfg.projects[k];for(var pp in s)PROJECTS[k][pp]=s[pp];
         // زامن أسماء المجلدات
@@ -7056,6 +7077,8 @@ function sidebarOpenFolder(id) {
     }}).catch(function(){if(!local){fetch("site-config.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(remote){if(remote)applyMulti(remote);}).catch(function(){});}});
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",loadAndApply);else loadAndApply();
+  setTimeout(function(){if(window.__wireVideoVolume)window.__wireVideoVolume();},1500);
+  window.addEventListener("load",function(){setTimeout(function(){if(window.__wireVideoVolume)window.__wireVideoVolume();},800);});
   window.addEventListener("load",function(){setTimeout(loadAndApply,400);});
 })();
 </script>

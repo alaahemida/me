@@ -346,7 +346,8 @@
 
   /* ===== 3) وسائط ===== */
   function videoCardImg(v){return v.parentNode?v.parentNode.querySelector(".play-card-img"):null;}
-  function applyVideo(i,src){var d=fdoc();if(!d)return;var v=[].slice.call(d.querySelectorAll("video.play-card-video, video"))[i];if(!v)return;v.setAttribute("data-src",src);v.src=src;v.muted=true;v.loop=true;v.playsInline=true;try{v.load();}catch(e){}cfg.videos[i]=src;markDirty();
+  function applyVideo(i,src){var d=fdoc(),W=fwin();if(!d)return;var v=[].slice.call(d.querySelectorAll("video.play-card-video, video"))[i];if(!v)return;v.setAttribute("data-src",src);v.src=src;v.loop=true;v.playsInline=true;try{v.load();}catch(e){}cfg.videos[i]=src;markDirty();
+    (function(vv){function fit(){if(W&&W.__fitVideo)W.__fitVideo(vv);}vv.addEventListener("loadedmetadata",fit);if(vv.readyState>=1)fit();})(v);if(W&&W.__wireVideoVolume)W.__wireVideoVolume();
     // توليد صورة معاينة تلقائياً من أول لقطة (للملفات المرفوعة المضمّنة)
     if(src.indexOf("data:")===0){try{v.addEventListener("loadeddata",function once(){v.removeEventListener("loadeddata",once);try{var cv=document.createElement("canvas");cv.width=v.videoWidth||640;cv.height=v.videoHeight||480;cv.getContext("2d").drawImage(v,0,0,cv.width,cv.height);var poster=cv.toDataURL("image/jpeg",0.8);setCardImg(i,poster,true);}catch(e){}});}catch(e){}}}
   function setCardImg(i,src,autoOnly){var d=fdoc();if(!d)return;var v=[].slice.call(d.querySelectorAll("video.play-card-video, video"))[i];if(!v)return;var img=videoCardImg(v);if(!img)return;
