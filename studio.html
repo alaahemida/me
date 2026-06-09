@@ -149,7 +149,7 @@
         <div class="pane" id="pane-pages">
           <div class="note">أضف صفحات مخصصة تظهر كبطاقات على الموقع وتُفتح بنافذة احترافية. أخفِ أي صفحة أو قسم.</div>
           <button class="bigbtn" id="addPage">➕ إضافة صفحة جديدة</button><div id="pageList"></div>
-          <div class="gt">إظهار / إخفاء أقسام الموقع</div><div id="visList"></div>
+          <div class="gt">تعديل الأقسام</div><div id="sectionsBox"></div><div class="gt">إظهار / إخفاء أقسام الموقع</div><div id="visList"></div>
         </div>
         <div class="pane" id="pane-cv"><div class="note">استبدل ملف السيرة الذاتية.</div><div id="cvBox"></div></div>
         <div class="pane" id="pane-style"></div>
@@ -179,12 +179,29 @@
 
   /* ===== الإعدادات (config) — تُحفظ وتُطبّق ===== */
   var cfg=loadCfg();
+  function _idb(){return new Promise(function(res,rej){try{var r=indexedDB.open("studio_db",1);r.onupgradeneeded=function(){try{r.result.createObjectStore("kv");}catch(e){}};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};}catch(e){rej(e);}});}
+  function idbGet(k){return _idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction("kv","readonly"),rq=t.objectStore("kv").get(k);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});});}
+  function idbSet(k,v){return _idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=function(){res(true);};t.onerror=function(){rej(t.error);};});});}
   function loadCfg(){try{var ls=localStorage.getItem("site_config");if(ls)return JSON.parse(ls);}catch(e){}return {};}
-  function ensure(){cfg.texts=cfg.texts||{};cfg.images=cfg.images||{};cfg.videos=cfg.videos||{};cfg.projects=cfg.projects||{};cfg.newProjects=cfg.newProjects||[];cfg.style=cfg.style||{};cfg.visibility=cfg.visibility||{};cfg.pages=cfg.pages||[];cfg.seo=cfg.seo||{};cfg.social=cfg.social||{};}
+  function loadCfgAsync(){return idbGet("site_config").then(function(c){if(c){cfg=c;ensure();}}).catch(function(){});}
+  function ensure(){cfg.texts=cfg.texts||{};cfg.images=cfg.images||{};cfg.videos=cfg.videos||{};cfg.projects=cfg.projects||{};cfg.newProjects=cfg.newProjects||[];cfg.style=cfg.style||{};cfg.visibility=cfg.visibility||{};cfg.pages=cfg.pages||[];cfg.seo=cfg.seo||{};cfg.social=cfg.social||{};cfg.about=cfg.about||{};cfg.experience=cfg.experience||[];}
   ensure();
   var dirty=false;
   function markDirty(){dirty=true;document.getElementById("btnSave").classList.add("dirty");}
-  function saveCfg(silent){try{localStorage.setItem("site_config",JSON.stringify(cfg));dirty=false;document.getElementById("btnSave").classList.remove("dirty");if(!silent)toast("تم الحفظ ✓ — التعديلات ظاهرة على الموقع");}catch(e){toast("تعذّر الحفظ: المساحة ممتلئة؟",1);}}
+  function saveCfg(silent){
+    // الأساس: IndexedDB (سعة كبيرة). احفظ مرجعاً صغيراً في localStorage للتحميل السريع.
+    idbSet("site_config",cfg).then(function(){
+      dirty=false;document.getElementById("btnSave").classList.remove("dirty");
+      // خزّن نسخة خفيفة (بلا صور base64 ضخمة) في localStorage كاحتياطي سريع
+      try{var light=JSON.parse(JSON.stringify(cfg));function strip(o){if(!o)return;["images","videos","cv"].forEach(function(k){});}
+        localStorage.setItem("site_config",JSON.stringify(cfg));}catch(e){try{localStorage.removeItem("site_config");}catch(_){}}
+      if(!silent)toast("تم الحفظ ✓ — التعديلات ظاهرة على الموقع");
+    }).catch(function(e){
+      // fallback: localStorage فقط
+      try{localStorage.setItem("site_config",JSON.stringify(cfg));dirty=false;document.getElementById("btnSave").classList.remove("dirty");if(!silent)toast("تم الحفظ ✓");}
+      catch(e2){toast("تعذّر الحفظ: حاول تقليل حجم الصور/الفيديو المرفوعة",1);}
+    });
+  }
   document.getElementById("btnSave").onclick=function(){pushAll();saveCfg();};
   // طبّق الإعدادات على الإطار (للمعاينة الحية عند الإقلاع)
   function applyCfgToFrame(){var W=fwin();if(W&&typeof W.__applyConfig==="function")W.__applyConfig(cfg);}
@@ -260,8 +277,12 @@
       document.getElementById("addPage").onclick=addPage;
       document.getElementById("btnExport").onclick=exportHTML;
       document.getElementById("btnPublish").onclick=openPublish;}
-    buildText();imageList();mediaList();projectList();buildPages();buildVis();buildCV();buildStyle();buildPro();
-    setTimeout(function(){imageList();projectList();},1400);}
+    // حمّل الإعدادات المحفوظة من IndexedDB (تحوي الصور الكبيرة) ثم ابنِ وطبّق
+    loadCfgAsync().then(function(){applyCfgToFrame();buildAll();}).catch(function(){buildAll();});
+    buildAll();
+  }
+  function buildAll(){buildText();imageList();mediaList();projectList();buildPages();buildSections();buildVis();buildCV();buildStyle();buildPro();
+    setTimeout(function(){imageList();projectList();},1200);}
 
   /* ===== أدوات ===== */
   function dec(u){try{return decodeURIComponent((u||"").split("?")[0].split("#")[0].replace(BASE,"").replace("https://ahmedyassen.me/Portfilio%20project/",""));}catch(e){return u;}}
@@ -269,6 +290,17 @@
   function keyOf(im){return dec(im.getAttribute("data-cp-orig")||im.getAttribute("src"));}
   function toast(m,t){var x=document.getElementById("toast");x.textContent=m;x.className="show"+(t===1?" err":t===2?" warn":"");clearTimeout(x._t);x._t=setTimeout(function(){x.className="";},2400);}
   function fileToDataURL(f,cb){var r=new FileReader();r.onload=function(){cb(r.result);};r.onerror=function(){toast("تعذّر قراءة الملف",1);};r.readAsDataURL(f);}
+  function compressImage(file,cb){
+    if(!/^image\//.test(file.type)||/gif|svg/.test(file.type)){return fileToDataURL(file,cb);}
+    try{var img=new Image();var url=URL.createObjectURL(file);
+      img.onload=function(){URL.revokeObjectURL(url);var max=1400,w=img.width,h=img.height;
+        if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
+        try{var c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);cb(c.toDataURL("image/jpeg",0.82));}catch(e){fileToDataURL(file,cb);}};
+      img.onerror=function(){URL.revokeObjectURL(url);fileToDataURL(file,cb);};img.src=url;
+    }catch(e){fileToDataURL(file,cb);}
+  }
+  // حقل تعديل عام
+  function field(lab,val,fn,ta){var w=document.createElement("div");w.className="f";w.innerHTML="<label>"+esc(lab)+"</label>";var inp=document.createElement(ta?"textarea":"input");if(!ta)inp.type="text";inp.value=val||"";inp.addEventListener("input",function(){fn(inp.value);});w.appendChild(inp);return w;}
   function pickFile(acc,cb){var i=document.createElement("input");i.type="file";i.accept=acc;i.onchange=function(){if(i.files[0])cb(i.files[0]);};i.click();}
   function askURL(l,cb){var u=prompt(l||"الصق الرابط:");if(u&&u.trim())cb(u.trim());}
   function sizeOf(el){var r=el.getBoundingClientRect(),w=r.width,h=r.height;if(el.classList&&el.classList.contains("play-card-img")&&(w<40||h<40||h<w*.3))return{w:255,h:320};if(!w)w=parseFloat(el.getAttribute("width"))||el.naturalWidth||120;if(!h)h=parseFloat(el.getAttribute("height"))||el.naturalHeight||w;return{w:w,h:h};}
@@ -278,7 +310,7 @@
     t.classList.add("active");var p=t.dataset.pane;document.getElementById("pane-"+p).classList.add("active");
     if(p==="images")imageList(document.getElementById("imgSearch").value);else if(p==="media")mediaList();
     else if(p==="projects")projectList();else if(p==="text")buildText();else if(p==="cv")buildCV();
-    else if(p==="style")buildStyle();else if(p==="pages"){buildPages();buildVis();}else if(p==="pro")buildPro();};});}
+    else if(p==="style")buildStyle();else if(p==="pages"){buildPages();buildSections();buildVis();}else if(p==="pro")buildPro();};});}
 
   /* جمع كل القيم الحية إلى cfg قبل الحفظ/النشر */
   function pushAll(){var d=fdoc();if(!d)return;ensure();
@@ -290,7 +322,7 @@
     }}
 
   /* ===== 1) نصوص ===== */
-  var TEXT=[{g:"العنوان الرئيسي"},{l:"الترحيب",sel:".hero-new .hero-line:nth-child(1) .hero-small"},{l:"الاسم",sel:"#hero-name"},{l:"جملة التبديل",sel:".hero-line:nth-child(3) .hero-small"},{l:"وضع التصميم",sel:"#hero-design-mode"},{l:"وضع الإبداع",sel:"#hero-play-mode"},{g:"عناصر متفرقة"},{l:"تلميح القهوة",sel:".hotcoffe-tip"},{l:"وسم السباحة",sel:".swim-tag"},{l:"وسم الملاحظة",sel:".note-tag"},{l:"عنوان الصفحة (Tab)",sel:"title"}];
+  var TEXT=[{g:"العنوان الرئيسي"},{l:"الترحيب",sel:".hero-new .hero-line:nth-child(1) .hero-small"},{l:"الاسم",sel:"#hero-name"},{l:"جملة التبديل",sel:".hero-line:nth-child(3) .hero-small"},{l:"وضع التصميم",sel:"#hero-design-mode"},{l:"وضع الإبداع",sel:"#hero-play-mode"},{g:"عناصر متفرقة"},{l:"تلميح القهوة",sel:".hotcoffe-tip"},{l:"وسم السباحة",sel:".swim-tag"},{l:"وسم الملاحظة",sel:".note-tag"},{l:"عنوان الصفحة (Tab)",sel:"title"},{g:"بطاقة About me"},{l:"نبذة About me",sel:"#about-comment .fc-msg-text"}];
   function buildText(){var d=fdoc(),root=document.getElementById("pane-text");root.innerHTML="";if(!d)return;
     TEXT.forEach(function(f){if(f.g){var g=document.createElement("div");g.className="gt";g.textContent=f.g;root.appendChild(g);return;}
       var el=d.querySelector(f.sel);if(!el)return;var v=(el.textContent||"").trim();
@@ -308,7 +340,7 @@
       var s=sizeOf(im),cur=cfg.images[key]||im.getAttribute("data-cp-orig")||im.getAttribute("src");
       var c=document.createElement("div");c.className="asset";
       c.innerHTML='<div class="asset-top"><div class="thumb"><img src="'+esc(cur)+'" onerror="this.style.display=\'none\'"></div><div class="meta"><div class="nm">'+esc(key)+'</div><div class="sz">'+Math.round(s.w)+'×'+Math.round(s.h)+' px</div></div></div><div class="acts"><button class="mini acc up">⬆ من الجهاز</button><button class="mini url">🔗 رابط</button></div>';
-      c.querySelector(".up").onclick=function(){pickFile("image/*",function(f){fileToDataURL(f,function(dt){applyImg(key,dt);imageList(filter);toast("تم — لا تنسَ الحفظ");});});};
+      c.querySelector(".up").onclick=function(){pickFile("image/*",function(f){compressImage(f,function(dt){applyImg(key,dt);imageList(filter);toast("تم — لا تنسَ الحفظ");});});};
       c.querySelector(".url").onclick=function(){askURL("رابط الصورة (jpg/png/gif/webp):",function(u){applyImg(key,u);imageList(filter);toast("تم الربط — احفظ");});};
       list.appendChild(c);});}
 
@@ -330,7 +362,7 @@
         '<div class="acts" style="margin-top:6px"><button class="mini upi">🖼️ صورة المعاينة</button><button class="mini urli">🔗 رابط صورة</button></div>';
       c.querySelector(".upv").onclick=function(){pickFile("video/*,image/gif",function(f){if(f.size>30*1048576&&!confirm("الملف كبير ("+(f.size/1048576|0)+"MB) وسيُحفظ داخل المتصفح. متابعة؟"))return;fileToDataURL(f,function(dt){applyVideo(i,dt);toast("تم تحديث الفيديو — وستُلتقط صورة معاينة تلقائياً");setTimeout(mediaList,1200);});});};
       c.querySelector(".urlv").onclick=function(){askURL("رابط الفيديو/GIF:",function(u){applyVideo(i,u);toast("تم الربط — احفظ");});};
-      c.querySelector(".upi").onclick=function(){pickFile("image/*",function(f){fileToDataURL(f,function(dt){setCardImg(i,dt);mediaList();toast("تم تحديث صورة المعاينة — احفظ");});});};
+      c.querySelector(".upi").onclick=function(){pickFile("image/*",function(f){compressImage(f,function(dt){setCardImg(i,dt);mediaList();toast("تم تحديث صورة المعاينة — احفظ");});});};
       c.querySelector(".urli").onclick=function(){askURL("رابط صورة المعاينة:",function(u){setCardImg(i,u);mediaList();toast("تم — احفظ");});};
       list.appendChild(c);});}
 
@@ -363,7 +395,7 @@
         var up=document.createElement("div");up.className="acts";up.style.marginBottom="8px";
         up.innerHTML='<button class="mini upsvg">⬆ رفع شكل المجلد (SVG)</button><button class="mini upimg">🖼️ رفع صورة المجلد</button>';
         up.querySelector(".upsvg").onclick=function(){pickFile(".svg,image/svg+xml",function(f){var r=new FileReader();r.onload=function(){NP.customSVG=r.result;NP.customImg="";refreshFolder(NP);markDirty();toast("تم رفع شكل المجلد ✓");};r.readAsText(f);});};
-        up.querySelector(".upimg").onclick=function(){pickFile("image/*",function(f){fileToDataURL(f,function(dt){NP.customImg=dt;NP.customSVG="";refreshFolder(NP);markDirty();toast("تم رفع صورة المجلد ✓");});});};
+        up.querySelector(".upimg").onclick=function(){pickFile("image/*",function(f){compressImage(f,function(dt){NP.customImg=dt;NP.customSVG="";refreshFolder(NP);markDirty();toast("تم رفع صورة المجلد ✓");});});};
         b.appendChild(up);
         if(NP.customSVG||NP.customImg){var clr=document.createElement("button");clr.className="mini danger";clr.style.width="100%";clr.style.marginBottom="8px";clr.textContent="↺ إزالة الشكل المخصّص (عودة للافتراضي)";clr.onclick=function(){NP.customSVG="";NP.customImg="";refreshFolder(NP);markDirty();projectList();};b.appendChild(clr);}
         var delp=document.createElement("button");delp.className="mini danger";delp.style.width="100%";delp.textContent="🗑 حذف المشروع";
@@ -375,15 +407,34 @@
       function syncNP(){if(NP){NP.previews=p.previews;refreshFolder(NP);}}
       function screens(){sl.innerHTML="";(p.previews||[]).forEach(function(pv,si){var row=document.createElement("div");row.className="screen";
         row.innerHTML='<div class="thumb"><img src="'+esc(pv.img)+'" onerror="this.style.display=\'none\'"></div><span class="nm">'+esc(pv.label||dec(pv.img)||("شاشة "+(si+1)))+'</span><button class="ic up" title="رفع">⬆</button><button class="ic url" title="رابط">🔗</button><button class="ic del" title="حذف">🗑</button>';
-        row.querySelector(".up").onclick=function(){pickFile("image/*",function(f){fileToDataURL(f,function(dt){pv.img=dt;markDirty();syncNP();screens();});});};
+        row.querySelector(".up").onclick=function(){pickFile("image/*",function(f){compressImage(f,function(dt){pv.img=dt;markDirty();syncNP();screens();});});};
         row.querySelector(".url").onclick=function(){askURL("رابط صورة الشاشة:",function(u){pv.img=u;markDirty();syncNP();screens();});};
         row.querySelector(".del").onclick=function(){p.previews.splice(si,1);markDirty();syncNP();screens();};
         sl.appendChild(row);});}
       screens();
       if(NP){var hint=document.createElement("div");hint.className="note";hint.style.margin="0 0 8px";hint.textContent="💡 أول ٤ شاشات تظهر كصور مصغّرة داخل المجلد على الموقع.";b.appendChild(hint);}
       var add=document.createElement("button");add.className="mini acc";add.style.width="100%";add.style.marginTop="4px";add.textContent="➕ إضافة شاشة";
-      add.onclick=function(){if(!p.previews)p.previews=[];pickFile("image/*",function(f){fileToDataURL(f,function(dt){p.previews.push({img:dt,label:"Screen "+(p.previews.length+1)});markDirty();syncNP();screens();});});};
-      b.appendChild(add);list.appendChild(box);});}
+      add.onclick=function(){if(!p.previews)p.previews=[];pickFile("image/*",function(f){compressImage(f,function(dt){p.previews.push({img:dt,label:"Screen "+(p.previews.length+1)});markDirty();syncNP();screens();});});};
+      b.appendChild(add);
+      // زر حذف / إخفاء المشروع
+      var del=document.createElement("button");del.className="mini danger";del.style.width="100%";del.style.marginTop="10px";
+      del.textContent=NP?"🗑 حذف المشروع نهائياً":"🚫 إخفاء هذا المشروع";
+      del.onclick=function(){
+        if(NP){
+          if(!confirm("حذف المشروع \""+(NP.name||"")+"\" نهائياً؟"))return;
+          var idx=cfg.newProjects.indexOf(NP);if(idx>-1)cfg.newProjects.splice(idx,1);
+          var fr=fdoc(),W2=fwin();var fel=fr&&fr.getElementById(NP.id);if(fel)fel.remove();
+          if(W2&&W2.PROJECTS)try{delete W2.PROJECTS[NP.key];}catch(e){}
+          if(W2&&typeof W2.__layoutNewProjects==="function"){W2.__layoutNewProjects(cfg.newProjects);cfg.newProjects.forEach(function(x){W2.__updateCustomFolder(x.id,x);});}
+          markDirty();projectList();toast("حُذف المشروع — لا تنسَ الحفظ");
+        }else{
+          cfg.visibility["#"+it.id]=false;applyCfgToFrame();markDirty();projectList();toast("أُخفي المشروع — احفظ. (المشاريع الأصلية تُخفى ولا تُحذف)");
+        }
+      };
+      b.appendChild(del);
+      // زر إظهار إن كان مخفياً (للأصلية)
+      if(!NP&&cfg.visibility["#"+it.id]===false){var sh=document.createElement("button");sh.className="mini";sh.style.width="100%";sh.style.marginTop="6px";sh.textContent="👁️ إظهار المشروع";sh.onclick=function(){cfg.visibility["#"+it.id]=true;applyCfgToFrame();markDirty();projectList();};b.appendChild(sh);}
+      list.appendChild(box);});}
   var PROJ_COLORS=["#FFC23D","#FF7A7A","#C26BFF","#46C46B","#5AA8FF","#FF9F45","#41D1C0","#FF6FA5","#7C6CFF","#2DD4BF"];
   function createProject(){var d=fdoc(),W=fwin();if(!d||!W||typeof W.__makeCustomFolder!=="function")return toast("حدّث المعاينة أولاً",1);
     var name=prompt("اسم المشروع (يظهر تحت المجلد):","New Project");if(!name)return;var role=prompt("الدور / الوصف:","Product Designer")||"";
@@ -417,64 +468,49 @@
   function addPage(){var title=prompt("عنوان الصفحة الجديدة:","صفحة جديدة");if(!title)return;
     cfg.pages.push({title:title,icon:"📄",content:"اكتب محتوى الصفحة هنا… يدعم HTML.",html:"اكتب محتوى الصفحة هنا… يدعم HTML.",hidden:false,left:1240,top:560+cfg.pages.length*70});
     markDirty();applyCfgToFrame();buildPages();toast("أُضيفت صفحة — عدّلها ثم احفظ");}
-  var VIS=[{l:"الشريط الجانبي",sel:".figma-sidebar"},{l:"صورة القهوة",sel:".hotcoffe-wrap"},{l:"ملصق gog",sel:".gog-wrap"},{l:"صورة السباحة",sel:".swim-wrap"},{l:"بطاقة CV",sel:"#cv-pdf-card"},{l:"لوحة Me Board",sel:".me-board-wrap,.me-wrap"},{l:"التوصيات",sel:"#rec-comment,#rec-comment-2,#rec-comment-3"}];
+  var VIS=[
+    {l:"قائمة الخبرة (Experience)",sel:".figma-sidebar"},
+    {l:"بطاقة About me",sel:"#about-comment"},
+    {l:"الأدوات (Tools)",sel:".tools-stack-wrap"},
+    {l:"أزرار التواصل (Behance/LinkedIn)",sel:"#contact-btns"},
+    {l:"صورة القهوة",sel:".hotcoffe-wrap"},
+    {l:"صورتي (Me)",sel:".me-photo-wrap"},
+    {l:"ملصق gog",sel:".gog-wrap"},
+    {l:"صورة السباحة",sel:".swim-wrap"},
+    {l:"بطاقة CV",sel:"#cv-pdf-card"},
+    {l:"تعليقات التوصيات",sel:"#rec-comment,#rec-comment-2,#rec-comment-3"}
+  ];
+  function buildSections(){var d=fdoc(),box=document.getElementById("sectionsBox");if(!box)return;box.innerHTML="";if(!d)return;
+    cfg.about=cfg.about||{};cfg.experience=cfg.experience||[];cfg.social=cfg.social||{};
+    function acc(title){var it=document.createElement("div");it.className="item";it.innerHTML='<div class="item-h"><span class="t">'+title+'</span><span class="chev">▾</span></div><div class="item-b"></div>';it.querySelector(".item-h").onclick=function(e){if(e.target.closest("input,textarea,button,label"))return;it.classList.toggle("open");};box.appendChild(it);return it.querySelector(".item-b");}
+    // About me
+    var aT=d.querySelector("#about-comment .fc-title"),aM=d.querySelector("#about-comment .fc-msg-text");
+    var ab=acc("💬 About me");
+    ab.appendChild(field("العنوان",cfg.about.title!=null?cfg.about.title:(aT?aT.textContent:""),function(v){cfg.about.title=v;if(aT)aT.textContent=v;markDirty();}));
+    ab.appendChild(field("نص التعريف (يدعم HTML/<br>)",cfg.about.text!=null?cfg.about.text:(aM?aM.innerHTML:""),function(v){cfg.about.text=v;if(aM)aM.innerHTML=v;markDirty();},true));
+    // Social
+    var sb=acc("🔗 روابط التواصل");
+    sb.appendChild(field("Behance URL",cfg.social.behance||"",function(v){cfg.social.behance=v;applySocial();markDirty();}));
+    sb.appendChild(field("LinkedIn URL",cfg.social.linkedin||"",function(v){cfg.social.linkedin=v;applySocial();markDirty();}));
+    sb.appendChild(field("البريد الإلكتروني",cfg.social.email||"",function(v){cfg.social.email=v;applySocial();markDirty();}));
+    // Experience
+    var jobs=[].slice.call(d.querySelectorAll(".nr-job"));var eb=acc("💼 الخبرة (Experience)");
+    jobs.forEach(function(j,i){cfg.experience[i]=cfg.experience[i]||{};var c=j.querySelector(".nr-company"),pr=j.querySelector(".nr-period"),ro=j.querySelector(".nr-role");
+      var row=document.createElement("div");row.style.cssText="border:1px solid var(--line);border-radius:9px;padding:9px;margin-bottom:8px";
+      row.appendChild(field("الجهة",cfg.experience[i].company!=null?cfg.experience[i].company:(c?c.textContent:""),function(v){cfg.experience[i].company=v;if(c)c.textContent=v;markDirty();}));
+      row.appendChild(field("الفترة",cfg.experience[i].period!=null?cfg.experience[i].period:(pr?pr.textContent:""),function(v){cfg.experience[i].period=v;if(pr)pr.textContent=v;markDirty();}));
+      row.appendChild(field("الدور",cfg.experience[i].role!=null?cfg.experience[i].role:(ro?ro.textContent:""),function(v){cfg.experience[i].role=v;if(ro)ro.textContent=v;markDirty();}));
+      var tog=document.createElement("label");tog.className="tog";tog.innerHTML="إخفاء هذا الصف"+'<input type="checkbox" '+(cfg.experience[i].hidden?"checked":"")+'>';
+      tog.querySelector("input").onchange=function(){cfg.experience[i].hidden=this.checked;j.style.display=this.checked?"none":"";markDirty();};row.appendChild(tog);
+      eb.appendChild(row);});
+  }
   function buildVis(){var d=fdoc(),list=document.getElementById("visList");list.innerHTML="";if(!d)return;
     VIS.forEach(function(v){var on=cfg.visibility[v.sel]!==false;var tog=document.createElement("label");tog.className="tog";tog.innerHTML=esc(v.l)+'<input type="checkbox" '+(on?"checked":"")+'>';
-      tog.querySelector("input").onchange=function(){var show=this.checked;cfg.visibility[v.sel]=show;d.querySelectorAll(v.sel).forEach(function(e){e.style.display=show?"":"none";});markDirty();};list.appendChild(tog);});}
-
-  /* ===== 6) CV ===== */
-  function applyCV(src){var d=fdoc();if(!d)return;var ifr=d.querySelector("#cv-pdf-card iframe");if(ifr)ifr.src=src+(src.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");d.querySelectorAll("a[download]").forEach(function(a){if((a.href||"").indexOf("CV")>=0)a.href=src;});cfg.cv=src;markDirty();}
-  function buildCV(){var box=document.getElementById("cvBox");var cur=cfg.cv||BASE+"Ahmed%20Yassen%20-%20Product%20designer%20CV%202026.pdf";
-    box.innerHTML='<div class="asset"><div class="asset-top"><div class="thumb">📄</div><div class="meta"><div class="nm">'+esc(dec(cur)||"CV.pdf")+'</div><div class="sz">PDF</div></div></div><div class="acts"><button class="mini acc up">⬆ رفع PDF</button><button class="mini url">🔗 رابط</button></div></div>';
-    box.querySelector(".up").onclick=function(){pickFile("application/pdf",function(f){if(f.size>10*1048576&&!confirm("الملف كبير، سيُحفظ بالمتصفح. متابعة؟"))return;fileToDataURL(f,function(dt){applyCV(dt);buildCV();toast("تم — احفظ");});});};
-    box.querySelector(".url").onclick=function(){askURL("رابط PDF:",function(u){applyCV(u);buildCV();toast("تم الربط — احفظ");});};}
-
-  /* ===== 7) مظهر ===== */
-  var THEMES=[{n:"فاتح كلاسيكي",bg:"#f0f0f0",dot:"#d4d4d4",name:"#1a1a1a"},{n:"ليلي",bg:"#15141c",dot:"#2a2935",name:"#ffffff"},{n:"كريمي",bg:"#f5f1e8",dot:"#e0d8c5",name:"#2a2118"},{n:"أزرق هادئ",bg:"#eef2ff",dot:"#cdd6f5",name:"#1e2a52"},{n:"وردي",bg:"#fdf0f4",dot:"#f3d4e0",name:"#5a1a35"},{n:"نعناعي",bg:"#eefaf3",dot:"#cde9d8",name:"#13402a"}];
-  var FONTS=["DM Sans","Inter","Poppins","Cairo","Tajawal","Montserrat","Space Grotesk"];
-  function buildStyle(){var d=fdoc(),r=document.getElementById("pane-style");var st=cfg.style;
-    var fontOpts=FONTS.map(function(f){return '<option '+(st.font===f?"selected":"")+'>'+f+'</option>';}).join("");
-    r.innerHTML='<div class="gt">ثيمات جاهزة</div><div class="themes" id="themeGrid"></div>'+
-      '<div class="gt">ألوان</div><div class="color"><label>خلفية الصفحة</label><input type="color" id="sBg" value="'+(st.bg||"#f0f0f0")+'"></div><div class="color"><label>نقاط الخلفية</label><input type="color" id="sDot" value="'+(st.dot||"#d4d4d4")+'"></div><div class="color"><label>لون الاسم</label><input type="color" id="sNm" value="'+(st.name||"#1a1a1a")+'"></div>'+
-      '<div class="gt">الخط</div><div class="f"><select id="sFont"><option value="">(الافتراضي)</option>'+fontOpts+'</select></div>'+
-      '<div class="gt">التخطيط</div><div class="sl"><label>تكبير اللوحة <b id="sZv">'+(st.zoom||"0.92")+'</b></label><input type="range" id="sZ" min="0.4" max="1.4" step="0.01" value="'+(st.zoom||"0.92")+'"></div>';
-    var grid=r.querySelector("#themeGrid");
-    THEMES.forEach(function(t){var el=document.createElement("div");el.className="theme";el.innerHTML='<div class="sw" style="background:'+t.bg+';border:1px solid '+t.dot+'"></div>'+t.n;
-      el.onclick=function(){st.bg=t.bg;st.dot=t.dot;st.name=t.name;applyStyle();buildStyle();markDirty();};grid.appendChild(el);});
-    function applyStyle(){if(!d)return;if(st.bg){d.body.style.background=st.bg;d.body.style.backgroundImage="radial-gradient(circle, "+(st.dot||"#d4d4d4")+" 1px, transparent 1px)";d.body.style.backgroundSize="28px 28px";}var n=d.querySelector("#hero-name");if(n&&st.name)n.style.color=st.name;var c=d.getElementById("canvas");if(c&&st.zoom)c.style.zoom=st.zoom;if(st.font){var fl=d.getElementById("cfg-font");if(!fl){fl=d.createElement("link");fl.id="cfg-font";fl.rel="stylesheet";d.head.appendChild(fl);}fl.href="https://fonts.googleapis.com/css2?family="+encodeURIComponent(st.font)+":wght@300;400;500;600;700&display=swap";d.body.style.fontFamily="'"+st.font+"',sans-serif";}}
-    r.querySelector("#sBg").oninput=function(){st.bg=this.value;applyStyle();markDirty();};
-    r.querySelector("#sDot").oninput=function(){st.dot=this.value;applyStyle();markDirty();};
-    r.querySelector("#sNm").oninput=function(){st.name=this.value;applyStyle();markDirty();};
-    r.querySelector("#sFont").onchange=function(){st.font=this.value;applyStyle();markDirty();};
-    var z=r.querySelector("#sZ"),zv=r.querySelector("#sZv");z.oninput=function(){st.zoom=this.value;zv.textContent=(+this.value).toFixed(2);applyStyle();markDirty();};}
-
-  /* ===== 8) احترافي (مخفي) ===== */
-  var proUnlocked=false;
-  function buildPro(){var r=document.getElementById("pane-pro");
-    if(!proUnlocked){r.innerHTML='<div class="locked-pro"><div class="ic">⭐</div><h3 style="margin-bottom:8px">الميزات الاحترافية</h3><p class="note" style="text-align:right">أدوات متقدمة: SEO، CSS مخصص، روابط التواصل، تغيير كلمة المرور، والنشر التلقائي على GitHub. مخفية افتراضياً.</p><button class="bigbtn" id="unlockPro">🔓 إظهار الميزات الاحترافية</button></div>';
-      r.querySelector("#unlockPro").onclick=function(){proUnlocked=true;buildPro();};return;}
-    var seo=cfg.seo,soc=cfg.social,st=cfg.style;
-    r.innerHTML=
-      '<div class="gt">SEO — تحسين محركات البحث</div><div class="f"><label>عنوان الموقع</label><input type="text" id="seoT" value="'+esc(seo.title||"")+'" placeholder="Ahmed Yassen — Product Designer"></div><div class="f"><label>وصف الموقع</label><textarea id="seoD" placeholder="وصف قصير يظهر في نتائج البحث">'+esc(seo.description||"")+'</textarea></div>'+
-      '<div class="gt">روابط التواصل</div><div class="f"><label>LinkedIn</label><input type="text" id="socLi" value="'+esc(soc.linkedin||"")+'"></div><div class="f"><label>Behance</label><input type="text" id="socBe" value="'+esc(soc.behance||"")+'"></div><div class="f"><label>البريد الإلكتروني</label><input type="text" id="socEm" value="'+esc(soc.email||"")+'"></div>'+
-      '<div class="gt">CSS مخصص</div><div class="f"><textarea class="code" id="cssBox" placeholder="/* أضف CSS خاصاً بك */">'+esc(st.customCSS||"")+'</textarea></div><button class="mini acc" id="applyCss" style="margin-bottom:14px">تطبيق CSS</button>'+
-      '<div class="gt">الأمان</div><div class="f"><label>تغيير كلمة المرور</label><input type="text" id="newPw" placeholder="كلمة مرور جديدة"></div><button class="mini" id="savePw" style="margin-bottom:14px">حفظ كلمة المرور</button>'+
-      '<div class="gt">النشر على GitHub</div><div class="note">لجعل التعديلات تظهر لكل الزوّار (وليس متصفحك فقط). يلتزم النشر بملف <code>site-config.json</code> في المستودع.</div>'+
-      '<div class="f"><label>اسم المستخدم (owner)</label><input type="text" id="ghOwner" placeholder="ahmedyassen3030-sudo"></div><div class="f"><label>المستودع (repo)</label><input type="text" id="ghRepo" placeholder="portfolio"></div><div class="f"><label>الفرع</label><input type="text" id="ghBranch" value="main"></div><div class="f"><label>Token (مخزّن بجهازك فقط)</label><input type="password" id="ghToken" placeholder="ghp_..."></div>'+
-      '<div class="gt">منطقة الخطر</div><button class="bigbtn danger" id="resetAll">🗑 مسح كل التعديلات المحفوظة</button>';
-    r.querySelector("#seoT").oninput=function(){seo.title=this.value;if(fdoc())fdoc().title=this.value;markDirty();};
-    r.querySelector("#seoD").oninput=function(){seo.description=this.value;markDirty();};
-    r.querySelector("#socLi").oninput=function(){soc.linkedin=this.value;applySocial();markDirty();};
-    r.querySelector("#socBe").oninput=function(){soc.behance=this.value;applySocial();markDirty();};
-    r.querySelector("#socEm").oninput=function(){soc.email=this.value;applySocial();markDirty();};
-    r.querySelector("#applyCss").onclick=function(){st.customCSS=r.querySelector("#cssBox").value;var d=fdoc();if(d){var cs=d.getElementById("cfg-css");if(!cs){cs=d.createElement("style");cs.id="cfg-css";d.head.appendChild(cs);}cs.textContent=st.customCSS;}markDirty();toast("طُبّق CSS — احفظ");};
-    r.querySelector("#savePw").onclick=function(){var v=r.querySelector("#newPw").value.trim();if(!v)return;try{localStorage.setItem("studio_pw",v);}catch(e){}toast("تم تغيير كلمة المرور ✓");};
-    var gh=cfg.github||{};["Owner","Repo","Branch","Token"].forEach(function(k){var el=r.querySelector("#gh"+k);if(el&&gh[k.toLowerCase()])el.value=gh[k.toLowerCase()];el.addEventListener("input",function(){cfg.github=cfg.github||{};cfg.github[k.toLowerCase()]=el.value;});});
-    r.querySelector("#resetAll").onclick=function(){if(confirm("مسح كل التعديلات المحفوظة محلياً؟ لا يمكن التراجع.")){try{localStorage.removeItem("site_config");}catch(e){}cfg={};ensure();booted=false;frame.src=frame.src;toast("مُسحت التعديلات");}};
+      tog.querySelector("input").onchange=function(){cfg.visibility[v.sel]=this.checked;applyCfgToFrame();markDirty();};list.appendChild(tog);});
   }
   function applySocial(){var d=fdoc();if(!d)return;var soc=cfg.social;
-    if(soc.linkedin){var a=d.querySelector('a.soc[aria-label="LinkedIn"]');if(a)a.href=soc.linkedin;}
-    if(soc.behance){var bb=d.querySelector('a.soc[aria-label="Behance"]');if(bb)bb.href=soc.behance;}
+    if(soc.behance){var b=d.querySelector(".btn-behance");if(b)b.setAttribute("onclick","window.open('"+soc.behance+"','_blank')");}
+    if(soc.linkedin){var l=d.querySelector(".btn-linkedin");if(l)l.setAttribute("onclick","window.open('"+soc.linkedin+"','_blank')");}
     if(soc.email){d.querySelectorAll('a[href^="mailto:"]').forEach(function(a){a.href="mailto:"+soc.email;});}}
 
   /* ===== النشر على GitHub ===== */

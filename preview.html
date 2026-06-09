@@ -6984,8 +6984,24 @@ function sidebarOpenFolder(id) {
         if(st.font){var fl=document.getElementById("cfg-font");if(!fl){fl=document.createElement("link");fl.id="cfg-font";fl.rel="stylesheet";document.head.appendChild(fl);}fl.href="https://fonts.googleapis.com/css2?family="+encodeURIComponent(st.font)+":wght@300;400;500;600;700&display=swap";document.body.style.fontFamily="'"+st.font+"',sans-serif";}
         if(st.customCSS!=null){var cs=document.getElementById("cfg-css");if(!cs){cs=document.createElement("style");cs.id="cfg-css";document.head.appendChild(cs);}cs.textContent=st.customCSS;}
       }
-      // إظهار/إخفاء
-      if(cfg.visibility)for(var vsel in cfg.visibility){document.querySelectorAll(vsel).forEach(function(e){e.style.display=cfg.visibility[vsel]?"":"none";});}
+      // التواصل (Behance/LinkedIn/البريد)
+      if(cfg.social){
+        if(cfg.social.behance){var _bb=document.querySelector(".btn-behance");if(_bb)_bb.setAttribute("onclick","window.open('"+cfg.social.behance+"','_blank')");}
+        if(cfg.social.linkedin){var _li=document.querySelector(".btn-linkedin");if(_li)_li.setAttribute("onclick","window.open('"+cfg.social.linkedin+"','_blank')");}
+        if(cfg.social.email){document.querySelectorAll('a[href^="mailto:"]').forEach(function(a){a.href="mailto:"+cfg.social.email;});}
+      }
+      // الخبرة (Experience)
+      if(cfg.experience){var _jobs=document.querySelectorAll(".nr-job");cfg.experience.forEach(function(e,i){var j=_jobs[i];if(!j)return;
+        var _c=j.querySelector(".nr-company"),_p=j.querySelector(".nr-period"),_r=j.querySelector(".nr-role");
+        if(_c&&e.company!=null)_c.textContent=e.company;if(_p&&e.period!=null)_p.textContent=e.period;if(_r&&e.role!=null)_r.textContent=e.role;
+        j.style.display=e.hidden?"none":"";});}
+      // About me
+      if(cfg.about){var _at=document.querySelector("#about-comment .fc-title");if(_at&&cfg.about.title!=null)_at.textContent=cfg.about.title;
+        var _am=document.querySelector("#about-comment .fc-msg-text");if(_am&&cfg.about.text!=null)_am.innerHTML=cfg.about.text;}
+      // إظهار/إخفاء (عبر stylesheet بـ !important ليتغلّب على سكربتات الموقع)
+      var hideSel=[];if(cfg.visibility)for(var vsel in cfg.visibility){if(cfg.visibility[vsel]===false)hideSel.push(vsel);else document.querySelectorAll(vsel).forEach(function(e){e.style.display="";});}
+      var vsEl=document.getElementById("cfg-visibility");if(!vsEl){vsEl=document.createElement("style");vsEl.id="cfg-visibility";document.head.appendChild(vsEl);}
+      vsEl.textContent=hideSel.length?(hideSel.join(",")+"{display:none !important;}"):"";
       // الصفحات المخصصة
       renderPages(cfg.pages||[]);
     }catch(err){console.warn("applyConfig",err);}
@@ -7024,22 +7040,23 @@ function sidebarOpenFolder(id) {
   if(!document.getElementById("cfg-anim")){var a=document.createElement("style");a.id="cfg-anim";a.textContent="@keyframes cfgFade{from{opacity:0}to{opacity:1}}@keyframes cfgPop{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}";document.head.appendChild(a);}
 
   /* ========= تحميل الإعدادات ========= */
+  // ===== تخزين IndexedDB (سعة كبيرة بدل localStorage المحدود) =====
+  function _idb(){return new Promise(function(res,rej){try{var r=indexedDB.open("studio_db",1);r.onupgradeneeded=function(){try{r.result.createObjectStore("kv");}catch(e){}};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};}catch(e){rej(e);}});}
+  window.__idbGet=function(k){return _idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction("kv","readonly"),rq=t.objectStore("kv").get(k);rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};});});};
+  window.__idbSet=function(k,v){return _idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=function(){res(true);};t.onerror=function(){rej(t.error);};});});};
+  function applyMulti(c){if(!c)return;window.__applyConfig(c);[300,800,1600,2600].forEach(function(t){setTimeout(function(){window.__applyConfig(c);},t);});}
   function loadAndApply(){
-    var local=null;
-    try{var ls=localStorage.getItem("site_config");if(ls)local=JSON.parse(ls);}catch(e){}
-    if(local)window.__applyConfig(local);
-    // ثم جلب الإعدادات المنشورة على المستودع (تظهر لكل الزوّار)
-    fetch("site-config.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(remote){
-      if(remote){
-        // المحلي يطغى على المنشور لصاحب الموقع، لكن إن لم يوجد محلي طبّق المنشور
-        if(!local)window.__applyConfig(remote);
-      }
-    }).catch(function(){});
+    // 1) localStorage السريع (للإعدادات الصغيرة)
+    var local=null;try{var ls=localStorage.getItem("site_config");if(ls)local=JSON.parse(ls);}catch(e){}
+    if(local)applyMulti(local);
+    // 2) IndexedDB (يطغى — يحوي الصور الكبيرة)
+    window.__idbGet("site_config").then(function(c){if(c)applyMulti(c);else if(!local){
+      // 3) الإعدادات المنشورة على المستودع (لكل الزوّار)
+      fetch("site-config.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(remote){if(remote)applyMulti(remote);}).catch(function(){});
+    }}).catch(function(){if(!local){fetch("site-config.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(remote){if(remote)applyMulti(remote);}).catch(function(){});}});
   }
-  // طبّق عدة مرات لتجاوز أنيميشن الموقع الذي قد يكتب فوق القيم
-  function loadAndApplyMulti(){loadAndApply();[400,1000,1800,2800].forEach(function(t){setTimeout(loadAndApply,t);});}
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",loadAndApplyMulti);else loadAndApplyMulti();
-  window.addEventListener("load",function(){setTimeout(loadAndApply,300);});
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",loadAndApply);else loadAndApply();
+  window.addEventListener("load",function(){setTimeout(loadAndApply,400);});
 })();
 </script>
 
