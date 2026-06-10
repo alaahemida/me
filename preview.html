@@ -6895,15 +6895,48 @@ function sidebarOpenFolder(id) {
     v.style.width=w+"px";v.style.height=hh+"px";v.style.objectFit="cover";v.style.maxWidth="none";}catch(e){}};
   // التحكم بالصوت: يبدأ 20% + عجلة الماوس ترفع/تخفض + إلغاء كتم عند المرور
   window.__wireVideoVolume=function(){
+    var ind=document.getElementById("cfg-vol-ind");
+    if(!ind){ind=document.createElement("div");ind.id="cfg-vol-ind";ind.style.cssText="position:fixed;z-index:2147483600;background:rgba(20,18,28,.9);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:6px 11px;border-radius:20px;pointer-events:none;display:none;align-items:center;gap:5px;box-shadow:0 6px 18px rgba(0,0,0,.35);";document.body.appendChild(ind);}
+    function ico(v,m){return m||v<=0?"🔇":v<0.5?"🔉":"🔊";}
+    function show(x,y,v,m){ind.style.display="flex";ind.style.left=(x+18)+"px";ind.style.top=(y+18)+"px";ind.textContent=ico(v,m)+" "+Math.round((m?0:v)*100)+"%";}
+    function hide(){ind.style.display="none";}
     document.querySelectorAll("video.play-card-video, video").forEach(function(v){
-      if(v.__volWired)return;v.__volWired=true;try{v.volume=0.2;}catch(e){}
-      v.addEventListener("play",function(){try{v.volume=(v.__vol!=null?v.__vol:0.2);}catch(e){}});
+      if(v.__volWired)return;v.__volWired=true;try{v.volume=0.2;v.__vol=0.2;}catch(e){}
       var card=v.closest(".play-card-inner")||v.parentNode||v;
-      card.addEventListener("mouseenter",function(){try{v.muted=false;if(v.__vol==null)v.__vol=0.2;v.volume=v.__vol;}catch(e){}});
-      card.addEventListener("mouseleave",function(){try{v.muted=true;}catch(e){}});
-      card.addEventListener("wheel",function(e){try{e.preventDefault();v.muted=false;var d=e.deltaY<0?0.06:-0.06;var nv=Math.max(0,Math.min(1,(v.__vol!=null?v.__vol:(v.volume||0.2))+d));v.__vol=nv;v.volume=nv;}catch(_){}}, {passive:false});
+      v.addEventListener("play",function(){try{v.volume=(v.__vol!=null?v.__vol:0.2);}catch(e){}});
+      card.addEventListener("mouseenter",function(e){try{v.muted=false;if(v.__vol==null)v.__vol=0.2;v.volume=v.__vol;}catch(_){}show(e.clientX,e.clientY,v.__vol,v.muted);});
+      card.addEventListener("mousemove",function(e){if(ind.style.display!=="none")show(e.clientX,e.clientY,v.__vol,v.muted);});
+      card.addEventListener("mouseleave",function(){try{v.muted=true;}catch(_){}hide();});
+      card.addEventListener("wheel",function(e){try{e.preventDefault();v.muted=false;var d=e.deltaY<0?0.06:-0.06;var nv=Math.max(0,Math.min(1,(v.__vol!=null?v.__vol:0.2)+d));v.__vol=nv;v.volume=nv;show(e.clientX,e.clientY,nv,false);}catch(_){}},{passive:false});
+      card.addEventListener("dblclick",function(e){try{e.preventDefault();v.controls=true;v.muted=false;v.volume=v.__vol||0.2;var rq=v.requestFullscreen||v.webkitRequestFullscreen||v.webkitEnterFullscreen;if(rq)rq.call(v);if(v.play)v.play();document.addEventListener("fullscreenchange",function fc(){if(!document.fullscreenElement){v.controls=false;document.removeEventListener("fullscreenchange",fc);}});}catch(_){}});
     });
   };
+  /* ===== استبدال ملف الـ CV عند فتحه (pdf-pip بمسار ثابت) ===== */
+  window.__cvSrc=window.__cvSrc||null;
+  function cvUrl(s){return s+(s.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");}
+  (function(){try{var ob=new MutationObserver(function(muts){if(!window.__cvSrc)return;muts.forEach(function(mu){(mu.addedNodes||[]).forEach(function(n){if(n.nodeType!==1)return;
+    var ifr=null;if(n.classList&&n.classList.contains("pdf-pip"))ifr=n.querySelector("iframe");else if(n.matches&&n.matches(".pdf-pip iframe"))ifr=n;else if(n.querySelector)ifr=n.querySelector(".pdf-pip iframe");
+    if(ifr)ifr.src=cvUrl(window.__cvSrc);});});});ob.observe(document.documentElement,{childList:true,subtree:true});}catch(e){}})();
+  /* ===== تحريك العناصر (مثل Framer) ===== */
+  window.__MOVABLES=[
+    {sel:".hero-new .hero-line:nth-child(1) .hero-small",name:"الترحيب (Hello, I'm)"},
+    {sel:"#hero-name",name:"الاسم"},
+    {sel:"#hero-design-mode",name:"وضع التصميم"},
+    {sel:"#hero-play-mode",name:"وضع الإبداع"},
+    {sel:".note-tag",name:"وسم الملاحظة"},
+    {sel:"#about-comment",name:"بطاقة About me"}
+  ];
+  window.__curLayout=window.__curLayout||{};
+  window.__applyLayout=function(layout){if(!layout)return;window.__curLayout=layout;window.__MOVABLES.forEach(function(m){var el=document.querySelector(m.sel);if(!el)return;if(el.__baseTransform==null)el.__baseTransform=el.style.transform||"";var L=layout[m.sel];if(!L)return;var dx=L.dx||0,dy=L.dy||0;el.style.transform=(el.__baseTransform+" translate("+dx+"px,"+dy+"px)").trim();if(L.z!=null){el.style.zIndex=L.z;if(getComputedStyle(el).position==="static")el.style.position="relative";}});};
+  window.__enableMove=function(on,cb){window.__MOVABLES.forEach(function(m){var el=document.querySelector(m.sel);if(!el)return;
+    if(!on){el.style.outline="";el.style.cursor="";if(el.__mvDown){el.removeEventListener("pointerdown",el.__mvDown);el.__mvDown=null;}return;}
+    el.style.outline="2px dashed rgba(124,108,255,.9)";el.style.outlineOffset="3px";el.style.cursor="move";
+    if(el.__baseTransform==null)el.__baseTransform=el.style.transform||"";
+    el.__mvDown=function(e){e.preventDefault();e.stopPropagation();var L=(window.__curLayout[m.sel]||{});var dx=L.dx||0,dy=L.dy||0;var sx=e.clientX,sy=e.clientY,ox=dx,oy=dy;
+      function mv(ev){dx=ox+(ev.clientX-sx);dy=oy+(ev.clientY-sy);el.style.transform=(el.__baseTransform+" translate("+dx+"px,"+dy+"px)").trim();}
+      function up(){document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);window.__curLayout[m.sel]=window.__curLayout[m.sel]||{};window.__curLayout[m.sel].dx=dx;window.__curLayout[m.sel].dy=dy;if(cb)cb(m.sel,dx,dy);}
+      document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);};
+    el.addEventListener("pointerdown",el.__mvDown);});};
 
 
   /* ===== مولّد مجلد مخصّص (للمشاريع الجديدة) ===== */
@@ -6996,7 +7029,7 @@ function sidebarOpenFolder(id) {
         });
       }
       // CV
-      if(cfg.cv){var ifr=document.querySelector("#cv-pdf-card iframe");if(ifr)ifr.src=cfg.cv+(cfg.cv.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");document.querySelectorAll("a[download]").forEach(function(a){if((a.href||"").indexOf("CV")>=0)a.href=cfg.cv;});}
+      if(cfg.cv){window.__cvSrc=cfg.cv;var ifr=document.querySelector("#cv-pdf-card iframe");if(ifr)ifr.src=cfg.cv+(cfg.cv.indexOf("#")<0?"#toolbar=0&navpanes=0&scrollbar=0&view=FitH&zoom=page-width":"");document.querySelectorAll("a[download]").forEach(function(a){if((a.href||"").indexOf("CV")>=0)a.href=cfg.cv;});document.querySelectorAll(".pdf-pip iframe").forEach(function(f){f.src=cvUrl(cfg.cv);});}
       // مظهر
       if(cfg.style){var st=cfg.style;
         if(st.bg){document.body.style.background=st.bg;if(st.dot){document.body.style.backgroundImage="radial-gradient(circle, "+st.dot+" 1px, transparent 1px)";document.body.style.backgroundSize="28px 28px";}}
@@ -7023,6 +7056,8 @@ function sidebarOpenFolder(id) {
       var hideSel=[];if(cfg.visibility)for(var vsel in cfg.visibility){if(cfg.visibility[vsel]===false)hideSel.push(vsel);else document.querySelectorAll(vsel).forEach(function(e){e.style.display="";});}
       var vsEl=document.getElementById("cfg-visibility");if(!vsEl){vsEl=document.createElement("style");vsEl.id="cfg-visibility";document.head.appendChild(vsEl);}
       vsEl.textContent=hideSel.length?(hideSel.join(",")+"{display:none !important;}"):"";
+      // تحريك العناصر
+      if(cfg.layout)window.__applyLayout(cfg.layout);
       // الصفحات المخصصة
       renderPages(cfg.pages||[]);
     }catch(err){console.warn("applyConfig",err);}
